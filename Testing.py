@@ -11,4 +11,4 @@ wrapper = ap.pitchInRealTimeWrapper()
 beforeTime = time.time()
 while True:
     ap.pitchInRealTime(wrapper[0], wrapper[1], wrapper[2],
-                       wrapper[3], wrapper[4], wrapper[5], beforeTime)
+                       wrapper[3], wrapper[4], beforeTime)
