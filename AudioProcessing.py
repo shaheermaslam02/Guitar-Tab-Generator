@@ -42,10 +42,6 @@ standard_guitar_dict = {'E2' : {(0, 0)}, 'F2' : {(0, 1)}, 'F#2/Gb2' : {(0, 2)},
 
 # iterate through and color a fret if the string, fret is in the note's set, find app.note in dictionary
 
-
-# first index is string, second is fret
-standard_guitar_dict = {'E2' : (0, 0), 'F2' : (0, 1), 'F#2' : (0, 2)}
-
 # recordAudio function to record audio as a file
 def recordAudio():
     fs=44100
@@ -62,11 +58,11 @@ def saveFile(audio, count = 1):
 def playAudio(audio):
     sd.play(audio, 44100)
 
-# pitchInRealTimeWrapper function for parameters to 
+# pitchInRealTimeWrapper function for parameters to pitchInRealTime
 def pitchInRealTimeWrapper():
     # initiating variables for use in sampling, tracking audio, etc.
 
-    # buffer_size: amount of time allowed for computer to process audio from mic
+    # buffer_size: amount of time allowed for computer to process audio from mic, 2048 samples
     buffer_size = 2048
     # channel: simply recording through one channel (one microphone)
     channel = 1
@@ -74,7 +70,7 @@ def pitchInRealTimeWrapper():
     format = pyaudio.paFloat32
     # default method
     method = "default"
-    # number of times audio is captured per second
+    # number of times audio is captured per second, standard is 44.1 kHz
     sample_rate = 44100
     # number of samples between frames
     hop_size = buffer_size//2
@@ -98,8 +94,7 @@ def pitchInRealTimeWrapper():
         hop_size, sample_rate)
     # setting unit in Hz
     pDetection.set_unit("Hz")
-    # Frequency under -40 dB will considered
-    # as a silence.
+    # under -40 Hz considered silence
     pDetection.set_silence(-40)
 
     return (mic, pDetection, tDetection, oDetection, hop_size)
@@ -113,19 +108,22 @@ def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTim
             dtype=aubio.float_type)
     # getting onset
     onset = oDetection(samples)[0]
-    # Finally get the pitch.
+    # getting the pitch
     pitch = pDetection(samples)[0]
+    # getting time when reading pitch
     afterTime = (time.time() - beforeTime)
+    # formatting with 6 decimal places
     afterTime = "{:6f}".format(afterTime)
     # using helper function with note dictionary to convert pitch to note
     note = pitchToNote(pitch)
     # get tempo
     tempo = tDetection(samples)[0]
-    # getting volume by root mean square: 
+    # getting volume by root mean square, which measures output: 
     volume = math.sqrt(np.sum(samples**2)/len(samples))
     # format output with 6 decimel places
     volume = "{:6f}".format(volume)
     pitchFreq = ''
+    # determining whether the pitch is low, mid or high
     if 0 <= pitch <= 140:
         pitchFreq = 'Low'
     elif 140 < pitch <= 2000:
@@ -133,8 +131,10 @@ def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTim
     elif pitch > 2000:
         pitchFreq = 'High'
     # print loudness value and pitch value
-    print(pitchFreq + 'Pitch:', str(pitch), 'Volume:', str(volume), 
+    '''
+    print(pitchFreq + ' Pitch:', str(pitch), 'Volume:', str(volume), 
           'Time:', str(afterTime), 'Note:', str(note))
+    '''
     return(pitch, volume, afterTime, note, tempo)
 
 # pitchToNote function to find the note of a pitch within a
@@ -142,23 +142,25 @@ def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTim
 def pitchToNote(pitch, notes = note_dictionary):
     for i in notes:
         temp = notes[i][0]
-        # selected 2.4 since base note in standard tuning E2 difference with
+        # selected 2 since base note in standard tuning E2 difference with
         # next note is around 4.9, so to keep notes distinct based on distance,
-        # checking within 2.4 as distance between note frequencies gets larger
+        # checking within 2 as distance between note frequencies gets larger
         # the higher you go
-        if temp - 2.4 <= pitch <= temp + 2.4 and pitch > 76:
+        if temp - 2 <= pitch <= temp + 2 and pitch > 76:
             return i
     return None
 
+
+
 # notes
 '''
-  - want to consider time, volume, note change as variables to consider when thinking
-    about whether a note should be stored or not into a list
   - minimum volume for a note should be 0.5: suggest users to use a microphone and make
-    sure audio is loud
-  - .01 volume difference required and time change should be 
-  - want to create
+    sure audio measure is loud
+  - .01 volume difference required and notes stored based on time change
   - create 2D guitar list to store notes
-  - finish drawing on recording screen and mapping out notes
-
+  - fix MVC violation bug
+  - if a lower string is highlighted, don't put in the higher ones into the tab
+  - feature to select tempo? baseline is 120 BPM which is half a beat a second, so based on 120/input bpm,
+    then 0.5 seconds / (120/input bpm), makes it easier to measure how many times to take in a note
+  
 '''

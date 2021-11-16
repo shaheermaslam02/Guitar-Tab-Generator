@@ -1,6 +1,5 @@
 # importing libraries
 from cmu_112_graphics import *
-import tkinter as tk
 from tkinter import *
 import AudioProcessing as ap
 import sounddevice as sd
@@ -10,16 +9,21 @@ import random
 
 # app started function
 def appStarted(app):
+    # app variables
     app.audio = ''
     app.count = 0
+    # screen variable to swap screens
     app.screen = 'main'
+    # other conditional variables
     app.recordOnce = False
     app.pitchDetect = False
     app.beforeTime = ''
+    # pitch detection parameters
     app.params = ap.pitchInRealTimeWrapper()
     app.timerDelay = 1
+    # random colors for note color
     app.colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink']
-    app.guitarBackground = app.scaleImage(app.loadImage('GuitarBackground.jpg'), 1)
+    app.guitarBackground = ImageTk.PhotoImage(app.scaleImage(app.loadImage('GuitarBackground.jpg'), 1))
     app.note = ''
     # rows for strings
     app.strings = 6
@@ -29,17 +33,36 @@ def appStarted(app):
     app.comparisonNote = ''
     app.tune = ''
     app.tuneColor = 'black'
-    
+    app.tabs = set()
+    # variable to keep track of guitar tab, 6 empty lists, 6 strings
+    app.guitarTab = [[], [], [], [], [], []]
+    app.bpm = ''
+    app.tempo = ''
+    app.displayTime = 0
+    app.measure = 1
+    app.fakeTime = 0
+    app.fake = False
 
 # timer fired function
 def timerFired(app):
+    app.fakeTime += 1
     if app.pitchDetect:
+        if app.fake:
+            app.fakeTime = 0
+            app.fake = False
+        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) == 0:
+            app.measure += 1
+            if app.measure > 4:
+                app.measure = 1
         properties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
                            app.params[3], app.params[4], app.beforeTime)
+        app.displayTime = properties[2]
         if properties[3] != None:
             app.note = str(properties[3])
+            app.tabs = ap.standard_guitar_dict.get(app.note, {})
         else:
             app.note = 'No note found.'
+            app.tabs = {}
     if app.recordOnce:
         app.audio = ap.recordAudio()
         app.recordOnce = False
@@ -63,11 +86,20 @@ def timerFired(app):
 # key pressed function
 def keyPressed(app, event):
     # to go to recording screen
-    if event.key == 'Space' and app.screen == 'main': 
+    if event.key == 'Space' and app.screen == 'main':
+        app.screen = 'directions'
+    elif event.key == 'Space' and app.screen == 'directions':
+        app.tempo = 0.5/(120/int(app.bpm)) 
         app.screen = 'record'
         app.recordOnce = True
         app.beforeTime = time.time()
         app.pitchDetect = True
+        app.fake = True
+    if app.screen == 'directions':
+        if event.key in {'1', '2', '3', '4', '5', '6', '7', '8', '9', '0'}:
+            app.bpm += event.key
+        elif event.key == 'Backspace':
+            app.bpm = app.bpm[0:len(app.bpm) - 1]
     # to stop recording
     if event.key == 's' and app.screen == 'record':
         sd.stop()
@@ -122,11 +154,13 @@ def drawFrets(app, canvas):
         y0 = initialBounds[1] + string*fretHeight
         y1 = y0 + fretHeight
         #fretChange = 0
-        for fret in range(app.frets + 1): # app.frets + 1 since we must consider the open fret
-            x0 = initialBounds[0] + fret*fretLength # + fretChange
-            x1 = x0 + fretLength # + fretChange
-            canvas.create_rectangle(x0, y0, x1, y1, fill = 'tan', outline = 'black', width = 4)
-            # fretChange -= .25
+        for fret in range(app.frets + 1):
+            x0 = initialBounds[0] + fret*fretLength
+            x1 = x0 + fretLength
+            if (string, fret) in (app.tabs):
+                canvas.create_rectangle(x0, y0, x1, y1, fill = 'green', outline = 'black', width = 4)
+            else:
+                canvas.create_rectangle(x0, y0, x1, y1, fill = 'tan', outline = 'black', width = 4)
 
 # draw strings function (6 strings)
 def drawStrings(app, canvas):
@@ -152,6 +186,7 @@ def drawBody(app, canvas):
                           app.height/2 + 8*fretHeight, fill = 'blue', outline = 'blue')
     canvas.create_rectangle(app.width/20, app.height/2, app.width/16, app.height/2 + 6*fretHeight, fill = 'black')
     canvas.create_rectangle(app.width*(9/10), app.height/2, app.width, app.height/2 + fretHeight*6, fill = 'black')
+
 # draw guitar functions, uses helper draw functions
 def drawGuitar(app, canvas):
     drawBody(app, canvas)
@@ -160,12 +195,18 @@ def drawGuitar(app, canvas):
 
 # drawing main screen function
 def drawMainScreen(app, canvas):
-    canvas.create_image(app.width/2, app.height/2, image = ImageTk.PhotoImage(app.guitarBackground))
+    canvas.create_image(app.width/2, app.height/2, image = app.guitarBackground)
     canvas.create_text(app.width/2 + app.width/4, app.height/4, text = 'Guitar Tab Generator', 
                        font = 'Arial 30 bold')
-    canvas.create_text(app.width/2 + app.width/4, app.height/2, text = 'Press space to begin recording.', 
+    canvas.create_text(app.width/2 + app.width/4, app.height/2, text = 'Press space to read the directions.', 
                        font = 'Arial 12 bold')
     canvas.create_text(app.width/2 + app.width/4, app.height/1.5, text = 'Press "t" to go to the standard guitar tuner.', font = 'Arial 12 bold')
+
+def drawDirectionsScreen(app, canvas):
+    canvas.create_text(app.width/2, app.height/4, text = 'Directions', font = 'Arial 24 bold')
+    canvas.create_text(app.width/2, app.height/3, text = 'Preferably use a USB microphone for best tab generation.', font = 'Arial 16 bold')
+    canvas.create_text(app.width/2, app.height/2, text = 'Please type in a tempo (120 BPM is standard): ' + app.bpm, font = 'Arial 20 bold')
+    canvas.create_text(app.width/2, app.height - app.height/8, text = 'Press space to begin recording!', font = 'Arial 20 bold')
 
 # draw recording screen function
 def drawRecordingScreen(app, canvas):
@@ -175,6 +216,9 @@ def drawRecordingScreen(app, canvas):
                          app.height/4 + 100, fill = 'red')
     canvas.create_text(app.width/2, app.height/4, text = 'Recording', font = 'Arial 16 bold')
     canvas.create_text(app.width/2, app.height/3.25, text = 'Press s to stop.', font = 'Arial 12 bold')
+    canvas.create_text(app.width/10, app.height/10, text = 'Tempo: ' + app.bpm + 'BPM', font = 'Arial 14 bold')
+    canvas.create_text(app.width*(9/10), app.height/10, text = 'Time: ' + str(app.displayTime) + 's', font = 'Arial 14 bold')
+    canvas.create_text(app.width/2, app.height*(9/10), text = 'Beat: ' + str(app.measure), font = 'Arial 16 bold')
     drawGuitar(app, canvas)
     # color changes depending on if there is a note or not
     if app.note == 'No note found.':
@@ -184,7 +228,6 @@ def drawRecordingScreen(app, canvas):
         canvas.create_text(app.width/2, app.height/2.15, text = app.note, font = 'Arial 24 bold', 
                         fill = app.colors[random.randint(0, len(app.colors) - 1)])
     
-
 # draw playing screen function
 def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - 100, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
@@ -201,6 +244,8 @@ def drawTunerScreen(app, canvas):
 def redrawAll(app, canvas):
     if app.screen == 'main':
         drawMainScreen(app, canvas)
+    elif app.screen == 'directions':
+        drawDirectionsScreen(app, canvas)
     elif app.screen == 'record':
         drawRecordingScreen(app, canvas)
     elif app.screen == 'tab':
