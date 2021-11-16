@@ -99,6 +99,9 @@ def pitchInRealTimeWrapper():
 
     return (mic, pDetection, tDetection, oDetection, hop_size)
 
+# reference for pitch detection: 
+# https://stackoverflow.com/questions/66508539/how-would-i-retrieve-the-pitch-and-loudness-from-other-samples-of-the-microphone 
+
 # pitchInRealTime function to detect pitch, volume, note, tempo over time
 def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
     # mic listening
@@ -150,7 +153,9 @@ def pitchToNote(pitch, notes = note_dictionary):
             return i
     return None
 
-
+# checking if a note is a legal note
+def isLegalNote(currProperties, lastProperties):
+    pass
 
 # notes
 '''
@@ -162,5 +167,4 @@ def pitchToNote(pitch, notes = note_dictionary):
   - if a lower string is highlighted, don't put in the higher ones into the tab
   - feature to select tempo? baseline is 120 BPM which is half a beat a second, so based on 120/input bpm,
     then 0.5 seconds / (120/input bpm), makes it easier to measure how many times to take in a note
-  
 '''

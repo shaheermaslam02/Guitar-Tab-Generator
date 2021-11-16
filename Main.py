@@ -35,37 +35,82 @@ def appStarted(app):
     app.tuneColor = 'black'
     app.tabs = set()
     # variable to keep track of guitar tab, 6 empty lists, 6 strings
-    app.guitarTab = [[], [], [], [], [], []]
+    app.guitarTab = [['E', '|'], 
+                     ['A', '|'], 
+                     ['D', '|'], 
+                     ['G', '|'], 
+                     ['B', '|'], 
+                     ['e', '|']]
     app.bpm = ''
     app.tempo = ''
     app.displayTime = 0
     app.measure = 1
     app.fakeTime = 0
     app.fake = False
+    app.lastProperties = ''
+    # moving through guitar tab
+    app.initial = 0
+    app.final = 20
 
 # timer fired function
 def timerFired(app):
+    # fakeTime variable to keep track of time
     app.fakeTime += 1
+    # if recording
     if app.pitchDetect:
+        # getting current pitch and volume properties
+        currProperties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
+                           app.params[3], app.params[4], app.beforeTime)
+        # resetting fakeTime when beginning recording
         if app.fake:
             app.fakeTime = 0
             app.fake = False
+        # if we are on the beat of the metronome
         if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) == 0:
             app.measure += 1
             if app.measure > 4:
-                app.measure = 1
-        properties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
-                           app.params[3], app.params[4], app.beforeTime)
-        app.displayTime = properties[2]
-        if properties[3] != None:
-            app.note = str(properties[3])
+                app.measure = 1   
+            # appending '-' on each measure
+            for i in app.guitarTab:
+                i.append('-')
+        # if the note is a legal note based on the last note
+        if app.lastProperties != '' and ap.isLegalNote(currProperties, app.lastProperties):
+            # getting note, string/fret
+            note = currProperties[3]
+            tab = ap.standard_guitar_dict(note, {})
+            stringFret = (-1, -1)
+            # looping through tab, getting lowest string and fret
+            if tab != set():
+                # getting lowest string and fret
+                for i in tab:
+                    if i[0] > stringFret[0]:
+                        stringFret = i
+            # if no string fret was found (ex. note is outside standard guitar notes), just add dashes 
+            if stringFret == (-1, -1):
+                for i in app.guitarTab:
+                    i.append('-')
+            else:
+                # appending correct fret on guitar tab
+                for i in range(len(app.guitarTab)):
+                    if i == stringFret[0]:
+                        app.guitarTab[i].append(str(stringFret[1]))
+                    else:
+                        app.guitarTab[i].append('-')
+        # display time for recording screen
+        app.displayTime = currProperties[2]
+        # if there is a note found, get the note, otherwise get nothing
+        if currProperties[3] != None:
+            app.note = str(currProperties[3])
             app.tabs = ap.standard_guitar_dict.get(app.note, {})
         else:
             app.note = 'No note found.'
             app.tabs = {}
+        lastProperties = currProperties
+    # call record audio once
     if app.recordOnce:
         app.audio = ap.recordAudio()
         app.recordOnce = False
+    # if the screen is the guitar tuner
     if app.screen == 'tuner' and app.tuneNote != 'No note selected.':
         properties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
                            app.params[3], app.params[4], 0)
@@ -85,9 +130,10 @@ def timerFired(app):
 
 # key pressed function
 def keyPressed(app, event):
-    # to go to recording screen
+    # to go to directions screen
     if event.key == 'Space' and app.screen == 'main':
         app.screen = 'directions'
+    # to go to recording screen
     elif event.key == 'Space' and app.screen == 'directions':
         app.tempo = 0.5/(120/int(app.bpm)) 
         app.screen = 'record'
@@ -118,7 +164,7 @@ def keyPressed(app, event):
     # to go to tuner screen
     if event.key == 't':
         app.screen = 'tuner'
-    # tuner conditions
+    # tuner conditions to select note to tune to
     if app.screen == 'tuner':
         if event.key == 'E' or event.key == 'e':
             app.tuneNote = 'E'
@@ -145,15 +191,15 @@ def mousePressed(app, event):
 
 # draw frets function (24 frets)
 def drawFrets(app, canvas):
+    # bounds of the guitar frets
     initialBounds = (app.width/10, app.height/2)
     endBounds = (app.width*(9/10), app.height/1.3)
     fretHeight = (endBounds[1] - initialBounds[1])/app.strings
     fretLength = (endBounds[0] - initialBounds[0])/app.frets
-
+    # drawing each string and fret, coloring green if note is found
     for string in range(app.strings):
         y0 = initialBounds[1] + string*fretHeight
         y1 = y0 + fretHeight
-        #fretChange = 0
         for fret in range(app.frets + 1):
             x0 = initialBounds[0] + fret*fretLength
             x1 = x0 + fretLength
@@ -232,6 +278,16 @@ def drawRecordingScreen(app, canvas):
 def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - 100, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
     canvas.create_text(app.width/2, app.height - 50, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
+    # setting initial bound for drawing tab
+    initialBounds = (app.width/6, app.height/6)
+    # drawing tab on screen
+    for i in range(len(app.guitarTab)):
+        height = (app.height/20)
+        tempFinal = app.final
+        if tempFinal >= len(app.guitarTab):
+            tempFinal = len(app.guitarTab[0])
+        for j in range(app.initial, tempFinal):
+            canvas.create_text(initialBounds[0] + j*(app.width/100), initialBounds[1] + i*(height), text = app.guitarTab[i][j], font = 'Arial 16 bold')
 
 # draw tuning screen function
 def drawTunerScreen(app, canvas):
@@ -243,16 +299,15 @@ def drawTunerScreen(app, canvas):
 # redrawAll function
 def redrawAll(app, canvas):
     if app.screen == 'main':
-        drawMainScreen(app, canvas)
+            drawMainScreen(app, canvas)
     elif app.screen == 'directions':
-        drawDirectionsScreen(app, canvas)
+            drawDirectionsScreen(app, canvas)
     elif app.screen == 'record':
-        drawRecordingScreen(app, canvas)
+            drawRecordingScreen(app, canvas)
     elif app.screen == 'tab':
-        drawTabScreen(app, canvas)
+            drawTabScreen(app, canvas)
     elif app.screen == 'tuner':
-        drawTunerScreen(app, canvas)
-
+            drawTunerScreen(app, canvas)
 # runApp function
 def runGuitarTabGenerator():
     print('Running Guitar Tab Generator.')
