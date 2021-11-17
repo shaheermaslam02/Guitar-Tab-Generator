@@ -9,6 +9,8 @@ import random
 
 # app started function
 def appStarted(app):
+    resetProgram(app)
+def resetProgram(app):
     # app variables
     app.audio = ''
     app.count = 0
@@ -23,6 +25,7 @@ def appStarted(app):
     app.timerDelay = 1
     # random colors for note color
     app.colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink']
+    # guitar background image: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbe7p2TakHTliSZZLB6dBTBNIwyna2oLJ9Sg&usqp=CAU
     app.guitarBackground = ImageTk.PhotoImage(app.scaleImage(app.loadImage('GuitarBackground.jpg'), 1))
     app.note = ''
     # rows for strings
@@ -50,8 +53,8 @@ def appStarted(app):
     app.lastProperties = ''
     # moving through guitar tab
     app.initial = 0
-    app.final = 20
-
+    app.final = 90
+    app.tab_x, app.tab_y = 0, 2
 # timer fired function
 def timerFired(app):
     # fakeTime variable to keep track of time
@@ -151,12 +154,47 @@ def keyPressed(app, event):
         sd.stop()
         app.screen = 'tab'
         app.pitchDetect = False
+        # padding guitar tab 2D list with '-' to fill screen
+        if len(app.guitarTab) < app.final and app.final - len(app.guitarTab) > 1:
+            for i in app.guitarTab:
+                for j in range(0, app.final-len(app.guitarTab)):
+                    i.append('-')
+        # putting last lines in '|'
+        for i in app.guitarTab:
+            i.append('|')
+        app.final = len(app.guitarTab[0])
     # to play the audio
+    if app.screen == 'tab':
+        # changing tab selected position
+        if event.key == 'Right':
+            app.tab_y += 1
+            if app.tab_y > app.final - 3:
+                app.final += 1
+                app.initial += 1
+                for i in app.guitarTab:
+                    i.insert(-1, '-')
+        elif event.key == 'Left':
+            app.tab_y -= 1
+            if app.tab_y < 0:
+                app.tab_y += 1
+            elif app.tab_y < app.initial:
+                app.initial -= 1
+                app.final -= 1
+        elif event.key == 'Up':
+            app.tab_x -= 1
+            if app.tab_x < 0:
+                app.tab_x += 1
+        elif event.key == 'Down':
+            app.tab_x += 1
+            if app.tab_x > 5:
+                app.tab_x -= 1
+            
     if event.key == 'p' and app.screen == 'tab':
         ap.playAudio(app.audio)
     # to go back to main screen
     if event.key == 'm':
         app.screen = 'main'
+        appStarted(app)
     # to save as a file
     if event.key == 'f' and app.screen == 'tab':
         app.count += 1
@@ -279,15 +317,17 @@ def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - 100, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
     canvas.create_text(app.width/2, app.height - 50, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
     # setting initial bound for drawing tab
-    initialBounds = (app.width/6, app.height/6)
+    initialBounds = (app.width/16, app.height/3)
     # drawing tab on screen
     for i in range(len(app.guitarTab)):
         height = (app.height/20)
-        tempFinal = app.final
-        if tempFinal >= len(app.guitarTab):
-            tempFinal = len(app.guitarTab[0])
-        for j in range(app.initial, tempFinal):
-            canvas.create_text(initialBounds[0] + j*(app.width/100), initialBounds[1] + i*(height), text = app.guitarTab[i][j], font = 'Arial 16 bold')
+        fret = 0
+        for j in range(app.initial, app.final):
+            fret += 1
+            if (i, j) == (app.tab_x,app.tab_y):
+                canvas.create_text(initialBounds[0] + fret*(app.width/100), initialBounds[1] + i*(height), text = app.guitarTab[i][j], font = 'Arial 16 bold', fill = 'green')
+            else:   
+                canvas.create_text(initialBounds[0] + fret*(app.width/100), initialBounds[1] + i*(height), text = app.guitarTab[i][j], font = 'Arial 16 bold')
 
 # draw tuning screen function
 def drawTunerScreen(app, canvas):
