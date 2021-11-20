@@ -40,7 +40,9 @@ standard_guitar_dict = {'E2' : {(0, 0)}, 'F2' : {(0, 1)}, 'F#2/Gb2' : {(0, 2)},
                         'G#5/Ab5' : {(4, 21), (5, 15)}, 'A5' : {(4, 22), (5, 16)}, 'A#5/Bb5' : {(4, 23), (5, 17)}, 'B5' : {(4, 24), (5, 18)}, 'C6' : {(5, 19)}, 
                         'C#6/Db6' : {(5, 20)}, 'D6' : {(5, 21)}, 'D#6/Eb6' : {(5, 22)}, 'E6' : {(5, 23)}, 'F3' : {(5, 24)}}
 
-# iterate through and color a fret if the string, fret is in the note's set, find app.note in dictionary
+# set of fret numbers
+frets = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13',
+         '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24'}
 
 # recordAudio function to record audio as a file
 def recordAudio():
@@ -153,10 +155,103 @@ def pitchToNote(pitch, notes = note_dictionary):
             return i
     return None
 
-# checking if a note is a legal note
-def isLegalNote(currProperties, lastProperties):
-    pass
+# volume difference function
 
+def volumeDifference(current, last):
+    if float(current[1]) - float(last[1]) >= 0.1:
+        return True
+    return False        
+ 
+def miniTabDissection(section):
+    note = section[0][3]
+    for i in section[1:]:
+        if i[3] != note:
+            return False
+    return True
+
+# getting tuple (string, fret) for the note
+def getTab(note):
+    tab = standard_guitar_dict.get(note, {})
+    if tab != {}:
+        stringFret = ''
+        for i in tab:
+            if stringFret == '':
+                stringFret = i
+            elif i[1] < stringFret[1]:
+                stringFret = i
+        if stringFret == '':
+            return None
+        else:
+            return stringFret
+    return None
+
+# tab dissection function to correctly store notes into guitar tab
+def tabDissection(notes):
+    newTab = []
+    lastNote = ''
+    lastTabbed = ''
+    index = 0
+    for i in notes:
+        if float(i[1]) >= 0.1:
+            lastNote = i
+            break
+        index += 1
+    count = 1
+    fakeIndex = index + 1
+    print('First Note: ', lastNote[3])
+    for i in notes[index + 1:]:
+        print(count)
+        if i[3] == lastNote[3]:
+            count += 1
+        elif volumeDifference(i, notes[fakeIndex - 1]):
+            if count >= 5:
+                tab = getTab(lastNote[3])
+                if lastTabbed == '':
+                    lastTabbed = lastNote[4]
+                elif i[4] <= lastTabbed:
+                    lastTabbed = lastNote[4] + 2
+                else:
+                    lastTabbed = i[4]
+                newTab.append((tab[0], tab[1], lastTabbed))
+                lastNote = i
+                print('New note:', lastNote[3])
+                count = 1
+            else:
+                lastNote = i
+                print('New Note:', lastNote[3])
+                count = 1
+        elif miniTabDissection(notes[fakeIndex : fakeIndex + 5]):
+            if count >= 5:
+                tab = getTab(lastNote[3])
+                if lastTabbed == '':
+                    lastTabbed = lastNote[4]
+                elif i[4] > lastTabbed:
+                    lastTabbed = i[4]
+                else:
+                    lastTabbed = lastTabbed + 2
+                newTab.append((tab[0], tab[1], lastTabbed))
+                lastNote = i
+                print('New note:', lastNote[3])
+                count = 1
+            else:
+                lastNote = i
+                print('New Note:', lastNote[3])
+                count = 1
+        '''       
+        else:
+            if count >= 5:
+                tab = getTab(lastNote[3])
+                if lastTabbed == '':
+                    lastTabbed = lastNote[4]
+                elif lastTabbed <= i[4]:
+                    lastTabbed = lastNote[4] + 2
+                newTab.add((tab[0], tab[1], lastTabbed))
+                count = 0
+            lastNote = i
+        '''
+        fakeIndex += 1
+    print(newTab)
+    return newTab
 # notes
 '''
   - minimum volume for a note should be 0.5: suggest users to use a microphone and make
