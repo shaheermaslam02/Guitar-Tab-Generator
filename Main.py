@@ -27,6 +27,7 @@ def resetProgram(app):
     app.colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink']
     # guitar background image: https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbe7p2TakHTliSZZLB6dBTBNIwyna2oLJ9Sg&usqp=CAU
     app.guitarBackground = ImageTk.PhotoImage(app.scaleImage(app.loadImage('GuitarBackground.jpg'), 1))
+    app.kosbie = ImageTk.PhotoImage(app.scaleImage(app.loadImage('kosbie.png'), 1))
     app.note = ''
     # rows for strings
     app.strings = 6
@@ -204,6 +205,8 @@ def keyPressed(app, event):
                 app.guitarTab[app.tab_x][app.tab_y] = app.guitarTab[app.tab_x][app.tab_y] + event.key
         elif event.key == '-' and app.guitarTab[app.tab_x][app.tab_y] in ap.frets:
             app.guitarTab[app.tab_x][app.tab_y] = event.key
+        elif event.key == 'k':
+            app.screen = 'kosbie'
     if event.key == 'p' and app.screen == 'tab':
         ap.playAudio(app.audio)
     # to go back to main screen
@@ -339,6 +342,7 @@ def drawRecordingScreen(app, canvas):
 def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - 100, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
     canvas.create_text(app.width/2, app.height - 50, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
+    canvas.create_text(app.width/2, app.height - 10, text = 'Press ''k'' for a surprise...', font = 'Arial 8 bold', fill = 'red')
     # setting initial bound for drawing tab
     initialBounds = (app.width/16, app.height/3)
     # drawing tab on screen
@@ -360,18 +364,26 @@ def drawTunerScreen(app, canvas):
     canvas.create_text(app.width/2, app.height/2, text = app.tune, font = 'Arial 20 bold', fill = app.tuneColor)
     canvas.create_text(app.width/2, app.height - app.height/6, text = 'Hit E, A, D, G, B, # (High E) to tune to a note', font = 'Arial 12 bold')
 
+# fun draw kosbie screen
+def drawKosbie(app, canvas):
+    canvas.create_image(app.width/2, app.height/2, image = app.kosbie)
+    canvas.create_text(app.width/2, app.height/2, text = 'KOSBIEEEEEEE!!', font = 'Arial 20 bold', 
+                    fill = app.colors[random.randint(0, len(app.colors) - 1)])
+
 # redrawAll function
 def redrawAll(app, canvas):
     if app.screen == 'main':
-            drawMainScreen(app, canvas)
+        drawMainScreen(app, canvas)
     elif app.screen == 'directions':
-            drawDirectionsScreen(app, canvas)
+        drawDirectionsScreen(app, canvas)
     elif app.screen == 'record':
-            drawRecordingScreen(app, canvas)
+        drawRecordingScreen(app, canvas)
     elif app.screen == 'tab':
-            drawTabScreen(app, canvas)
+        drawTabScreen(app, canvas)
     elif app.screen == 'tuner':
-            drawTunerScreen(app, canvas)
+        drawTunerScreen(app, canvas)
+    elif app.screen == 'kosbie':
+        drawKosbie(app, canvas)
 # runApp function
 def runGuitarTabGenerator():
     print('Running Guitar Tab Generator.')
