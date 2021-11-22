@@ -252,6 +252,13 @@ def tabDissection(notes):
         fakeIndex += 1
     print(newTab)
     return newTab
+
+# storing the tab in the positions of the guitar tab
+def storeTab(notes, tab):
+    for i in notes:
+        tab[i[0]][i[2]] = str(i[1])
+    
+
 # notes
 '''
   - minimum volume for a note should be 0.5: suggest users to use a microphone and make

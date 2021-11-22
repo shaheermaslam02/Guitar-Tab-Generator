@@ -171,7 +171,10 @@ def keyPressed(app, event):
             i.append('|')
         app.final = len(app.guitarTab[0])
         printNotes(app.storedNotes)
-        ap.tabDissection(app.storedNotes)
+        # gathering legal notes
+        notes = ap.tabDissection(app.storedNotes)
+        # storing legal notes
+        ap.storeTab(notes, app.guitarTab)
     # to play the audio
     if app.screen == 'tab':
         # changing tab selected position
@@ -340,9 +343,9 @@ def drawRecordingScreen(app, canvas):
     
 # draw playing screen function
 def drawTabScreen(app, canvas):
-    canvas.create_text(app.width/2, app.height - 100, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
-    canvas.create_text(app.width/2, app.height - 50, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
-    canvas.create_text(app.width/2, app.height - 10, text = 'Press ''k'' for a surprise...', font = 'Arial 8 bold', fill = 'red')
+    canvas.create_text(app.width/2, app.height - app.height/8, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
+    canvas.create_text(app.width/2, app.height - app.height/16, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
+    canvas.create_text(app.width/2, app.height - app.height/32, text = 'Press ''k'' for a surprise...', font = 'Arial 8 bold', fill = 'red')
     # setting initial bound for drawing tab
     initialBounds = (app.width/16, app.height/3)
     # drawing tab on screen
