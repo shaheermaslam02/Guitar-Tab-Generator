@@ -5,6 +5,7 @@ import aubio
 import sounddevice as sd
 import pyaudio
 from scipy.io.wavfile import write
+import librosa
 # data breakdown and analysis libraries
 import numpy as np
 import pandas as pd
@@ -258,15 +259,97 @@ def storeTab(notes, tab):
     for i in notes:
         tab[i[0]][i[2]] = str(i[1])
     
+# going for algorithmic complexity #
+####################################
 
+
+def fakePitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
+    # mic listening
+    data = mic.read(hop_size)
+    # convert to aubio.float_type
+    samples = np.fromstring(data,
+            dtype=aubio.float_type)
+    # getting onset
+    onset = oDetection(samples)[0]
+    # getting the pitch
+    pitch = pDetection(samples)[0]
+    # getting time when reading pitch
+    afterTime = (time.time() - beforeTime)
+    # formatting with 6 decimal places
+    afterTime = "{:6f}".format(afterTime)
+    # using helper function with note dictionary to convert pitch to note
+    note = pitchToNote(pitch)
+    # get tempo
+    tempo = tDetection(samples)[0]
+    # getting volume by root mean square, which measures output: 
+    volume = math.sqrt(np.sum(samples**2)/len(samples))
+    # format output with 6 decimel places
+    volume = "{:6f}".format(volume)
+    pitchFreq = ''
+    # determining whether the pitch is low, mid or high
+    if 0 <= pitch <= 140:
+        pitchFreq = 'Low'
+    elif 140 < pitch <= 2000:
+        pitchFreq = 'Mid'
+    elif pitch > 2000:
+        pitchFreq = 'High'
+
+    return(pitch, volume, afterTime, note, tempo, samples, onset)
+
+# attempting to use zero crossing rate algorithm to measure pitch
+def zeroCrossingRate(samples):
+    # dividing the number of samples by the sampling rate to get seconds
+    seconds = len(samples)/44100 
+    zero_crossing_points = 0
+    for i in range(0, len(samples) - 1):
+        if samples[i] > 0 and samples[i + 1] < 0:
+            zero_crossing_points += 1
+    oscillations = zero_crossing_points/2
+    frequency = oscillations/seconds
+    return frequency
+
+# attempting to use autocorrelation method algorithm to measure pitch
+def AutoCorrelation(samples):
+    autocorrelation = []
+    for lag in range(len(samples)):
+        total = 0
+        for n in range(len(samples) - lag - 1):
+            total += samples[n] * samples[n + lag]
+        autocorrelation.append(total) 
+    return (autocorrelation, [n for n in range(len(autocorrelation))])
+
+# trying tempo using librosa beat tracking module: https://www.youtube.com/watch?v=_iNY2wjZAxU
+def tempoTracker(samples, sr = 44100):
+    tempo, beat_times = librosa.beat.beat_track(samples, sr = sr, start_bpm = 80, units = 'time')
+    clicks = librosa.clicks(beat_times, sr = sr, length = len(samples))
+    newSamples = samples + clicks
+    return (tempo, beat_times, newSamples)
+
+# low band filter: cutoff frequency = 200 Hz
+# https://stackoverflow.com/questions/24920346/filtering-a-wav-file-using-python
+
+def lowBand(samples):
+    sr = 44100
+    cutoff = 200 
+    freqRatio = cutoff / sr
+    n = int(math.sqrt(0.196201 + freqRatio**2)) / freqRatio
+    # moving average
+    cumulative = np.cumsum(np.insert(samples, 0, 0))
+    return (cumulative[n:] - cumulative[:-n]) / n
+
+# new algorithm to try and create a successful guitar tab
+def tabCreation(acNotes, tempo, beat_times):
+
+    pass
 # notes
 '''
-  - minimum volume for a note should be 0.5: suggest users to use a microphone and make
-    sure audio measure is loud
-  - .01 volume difference required and notes stored based on time change
-  - create 2D guitar list to store notes
-  - fix MVC violation bug
-  - if a lower string is highlighted, don't put in the higher ones into the tab
-  - feature to select tempo? baseline is 120 BPM which is half a beat a second, so based on 120/input bpm,
-    then 0.5 seconds / (120/input bpm), makes it easier to measure how many times to take in a note
+  - test with just one channel (no recording)
+  - mess with buffer size, other attributes of collecting pitch to try and get more accuracy
+  - test tempo, test bands, use these to create an algorithmically complex method for storing 
+    values into a guitar tab?
+  - create new guitar tab storing algorithm: depending on the legal notes based on autocorrelation 
+    frequency and maybe the low, mid and high passes with times for those notes, put into a guitar tab?
+  - one measure = 1 sequence of BPM, add dashed lines at each new measure
+  - look at tempo and multiples of tempo that evenly divide it such that notes are played at these times?
+    see if legal notes are there/within the range of when it was played + vol difference
 '''

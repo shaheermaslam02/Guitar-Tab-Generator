@@ -1,3 +1,5 @@
+# Main file to run the program using cmu_112_graphics for the UI
+
 # importing libraries
 from cmu_112_graphics import *
 from tkinter import *
@@ -71,7 +73,7 @@ def timerFired(app):
             app.fakeTime = 0
             app.fake = False
         # if we are on the beat of the metronome
-        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) == 0:
+        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) <= 0.01:
             app.measure += 1
             if app.measure > 4:
                 app.measure = 1   
@@ -115,7 +117,6 @@ def timerFired(app):
         else:
             app.note = 'No note found.'
             app.tabs = {}
-        
     # call record audio once
     if app.recordOnce:
         app.audio = ap.recordAudio()
