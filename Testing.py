@@ -13,10 +13,9 @@ beforeTime = time.time()
 i = 0
 autocorrelation = []
 original = []
-while i <= 100:
-    temp = ap.fakePitchInRealTime(wrapper[0], wrapper[1], wrapper[2],
+while i <= 50:
+    temp = ap.newPitchInRealTime(wrapper[0], wrapper[1], wrapper[2],
                        wrapper[3], wrapper[4], beforeTime)
-    print(temp[6])
     #print('Samples: ', temp[5])
 
     # using zero crossing rate algorithm
@@ -36,20 +35,52 @@ j = 0
 
 lags = [l for l in range(len(autocorrelation))]
 
-# autocorrelated graph, less noise
-plt.plot(lags, autocorrelation)
-plt.title('Autocorrelation Graph')
-plt.show()
-# original graph of samples
-plt.plot(lags, original)
-plt.title('Original Sample Graph')
-plt.show()
+peaks, indexes = ap.peakFinder(autocorrelation)
 
 frequencies = []
+frequencyIndexes = []
 while j < len(autocorrelation) / 1024:  
     frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
     print('Frequency: ', frequency)
     frequencies.append(frequency)
+    index = ((j + 1)*1024)
+    frequencyIndexes.append(index)
     j += 1
 
-#print(frequencies)
+noteIndexes = []
+notes = []
+plotNotes = []
+for i in range(len(frequencies)):
+    if ap.pitchToNote(frequencies[i]) != None:
+        notes.append(ap.pitchToNote(frequencies[i]))
+        plotNotes.append(frequencies[i] / 1000)
+        noteIndexes.append(frequencyIndexes[i])
+
+print(len(frequencies))
+print(len(peaks))
+print(len(notes))
+print(len(autocorrelation))
+print(len(original))
+
+fakeFrequencies = [i / 1000 for i in frequencies]
+
+# graphing everything
+fig, ax = plt.subplots(figsize = (16, 10))
+ax.plot(lags, original, alpha = 0.3)
+ax.plot(lags, autocorrelation, alpha = 0.5)
+ax.plot(indexes, peaks)
+ax.plot(frequencyIndexes, fakeFrequencies)
+ax.plot(noteIndexes, plotNotes)
+ax.set_title('Autocorrelated Samples, Original and Highlighted Peaks')
+ax.legend(['Original', 'Autocorrelated', 'Peaks', 'Frequencies', 'Detected Notes'])
+ax.grid()
+plt.show()
+
+# plt.plot([i for i in range(len(frequencies))], frequencies)
+# plt.title('Frequencies Graph')
+# plt.show()
+
+'''
+match peak to bin that frequency comes from, so the peaks and frequencies line up, then 
+put into guitar tab storing algorithm and dissect based on whether the note is really a note or not?
+'''

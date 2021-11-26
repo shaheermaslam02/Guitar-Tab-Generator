@@ -156,6 +156,8 @@ def pitchToNote(pitch, notes = note_dictionary):
             return i
     return None
 
+################################################################################
+
 # volume difference function
 
 def volumeDifference(current, last):
@@ -199,9 +201,9 @@ def tabDissection(notes):
         index += 1
     count = 1
     fakeIndex = index + 1
-    print('First Note: ', lastNote[3])
+    #print('First Note: ', lastNote[3])
     for i in notes[index + 1:]:
-        print(count)
+        #print(count)
         if i[3] == lastNote[3]:
             count += 1
         elif volumeDifference(i, notes[fakeIndex - 1]):
@@ -215,11 +217,11 @@ def tabDissection(notes):
                     lastTabbed = i[4]
                 newTab.append((tab[0], tab[1], lastTabbed))
                 lastNote = i
-                print('New note:', lastNote[3])
+                #print('New note:', lastNote[3])
                 count = 1
             else:
                 lastNote = i
-                print('New Note:', lastNote[3])
+                #print('New Note:', lastNote[3])
                 count = 1
         elif miniTabDissection(notes[fakeIndex : fakeIndex + 5]):
             if count >= 5:
@@ -232,11 +234,11 @@ def tabDissection(notes):
                     lastTabbed = lastTabbed + 2
                 newTab.append((tab[0], tab[1], lastTabbed))
                 lastNote = i
-                print('New note:', lastNote[3])
+                #print('New note:', lastNote[3])
                 count = 1
             else:
                 lastNote = i
-                print('New Note:', lastNote[3])
+                #print('New Note:', lastNote[3])
                 count = 1
         '''       
         else:
@@ -251,7 +253,7 @@ def tabDissection(notes):
             lastNote = i
         '''
         fakeIndex += 1
-    print(newTab)
+    #print(newTab)
     return newTab
 
 # storing the tab in the positions of the guitar tab
@@ -263,7 +265,7 @@ def storeTab(notes, tab):
 ####################################
 
 
-def fakePitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
+def newPitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
     # mic listening
     data = mic.read(hop_size)
     # convert to aubio.float_type
@@ -294,7 +296,7 @@ def fakePitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, befor
     elif pitch > 2000:
         pitchFreq = 'High'
 
-    return(pitch, volume, afterTime, note, tempo, samples, onset)
+    return(pitch, volume, afterTime, note, tempo, samples)
 
 # attempting to use zero crossing rate algorithm to measure pitch
 def zeroCrossingRate(samples):
@@ -308,7 +310,8 @@ def zeroCrossingRate(samples):
     frequency = oscillations/seconds
     return frequency
 
-# attempting to use autocorrelation method algorithm to measure pitch
+# attempting to use autocorrelation method algorithm to measure pitch, passing into zero crossing rates
+# finding the patterns within an audio signal, smoothing it out and using the new smoothed sample to find pitch
 def AutoCorrelation(samples):
     autocorrelation = []
     for lag in range(len(samples)):
@@ -318,38 +321,35 @@ def AutoCorrelation(samples):
         autocorrelation.append(total) 
     return (autocorrelation, [n for n in range(len(autocorrelation))])
 
-# trying tempo using librosa beat tracking module: https://www.youtube.com/watch?v=_iNY2wjZAxU
-def tempoTracker(samples, sr = 44100):
-    tempo, beat_times = librosa.beat.beat_track(samples, sr = sr, start_bpm = 80, units = 'time')
-    clicks = librosa.clicks(beat_times, sr = sr, length = len(samples))
-    newSamples = samples + clicks
-    return (tempo, beat_times, newSamples)
+# attempting to use the autocorrelated samples for onset detection and finding peaks in audio
+def peakFinder(autocorrelated):
+    # calling helper function
+    threshold, peaks, indexes = peakThreshold(autocorrelated)
+    newPeaks = []
+    newIndexes = []
+    # appending peaks and indexes based on threshold
+    for i in range(len(peaks)):
+        if peaks[i] > threshold:
+            newPeaks.append(peaks[i])
+            newIndexes.append(indexes[i])
+    return newPeaks, newIndexes
 
-# low band filter: cutoff frequency = 200 Hz
-# https://stackoverflow.com/questions/24920346/filtering-a-wav-file-using-python
+# finding the peak threshold by taking the average of all the peaks since peaks in audio should be higher
+def peakThreshold(autocorrelated):
+    indexes = []
+    peaks = []
+    # getting peak threshold by averaging all the peaks since notes should be elevated in pitch
+    for i in range(1, len(autocorrelated) - 1):
+        # finding peaks
+        if autocorrelated[i + 1] < autocorrelated[i] and autocorrelated[i] > autocorrelated[i - 1]:
+            indexes.append(i)
+            peaks.append(autocorrelated[i])
+    # minimum threshold for peak
+    threshold = 0.1
+    return (threshold, peaks, indexes)
 
-def lowBand(samples):
-    sr = 44100
-    cutoff = 200 
-    freqRatio = cutoff / sr
-    n = int(math.sqrt(0.196201 + freqRatio**2)) / freqRatio
-    # moving average
-    cumulative = np.cumsum(np.insert(samples, 0, 0))
-    return (cumulative[n:] - cumulative[:-n]) / n
-
-# new algorithm to try and create a successful guitar tab
-def tabCreation(acNotes, tempo, beat_times):
+# new algorithm to try and create a successful guitar tab from peaks, frequencies, tabs
+def tabGeneration(autocorrelated, notes, noteIndexes, peaks, peakIndexes):
+    newTab = []
 
     pass
-# notes
-'''
-  - test with just one channel (no recording)
-  - mess with buffer size, other attributes of collecting pitch to try and get more accuracy
-  - test tempo, test bands, use these to create an algorithmically complex method for storing 
-    values into a guitar tab?
-  - create new guitar tab storing algorithm: depending on the legal notes based on autocorrelation 
-    frequency and maybe the low, mid and high passes with times for those notes, put into a guitar tab?
-  - one measure = 1 sequence of BPM, add dashed lines at each new measure
-  - look at tempo and multiples of tempo that evenly divide it such that notes are played at these times?
-    see if legal notes are there/within the range of when it was played + vol difference
-'''

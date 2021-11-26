@@ -53,12 +53,20 @@ def resetProgram(app):
     app.measure = 1
     app.fakeTime = 0
     app.fake = False
-    app.lastProperties = ''
     # moving through guitar tab
     app.initial = 0
-    app.final = 90
+    app.final = 0
     app.tab_x, app.tab_y = 0, 2
     app.storedNotes = []
+    # original samples
+    app.original = []
+    # measure count
+    app.count = 0
+    # list of all readings from microphone
+    app.properties = []
+    # bar for loading screen
+    app.bar = (app.width/4, app.height/2, app.width/4, app.height/2 + app.height/4)
+    app.barCount = 0
 # timer fired function
 def timerFired(app):
     # fakeTime variable to keep track of time
@@ -66,20 +74,27 @@ def timerFired(app):
     # if recording
     if app.pitchDetect:
         # getting current pitch and volume properties
-        currProperties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
+        currProperties = ap.newPitchInRealTime(app.params[0], app.params[1], app.params[2], 
                            app.params[3], app.params[4], app.beforeTime)
+        app.properties.append(currProperties)
         # resetting fakeTime when beginning recording
         if app.fake:
             app.fakeTime = 0
             app.fake = False
         # if we are on the beat of the metronome
-        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) <= 0.01:
+        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) <= 0:
             app.measure += 1
             if app.measure > 4:
                 app.measure = 1   
-            # appending '-' on each measure
-            for i in app.guitarTab:
-                i.append('-')
+                app.count += 1
+                # appending '|' on new measure
+                if app.count % 2 == 0:
+                    for i in app.guitarTab:
+                        i.append('|')
+            else:
+                # appending '-' on each beat
+                for i in app.guitarTab:
+                    i.append('-')
         '''
         # if the note is a legal note based on the last note
         if app.lastProperties != '' and ap.isLegalNote(currProperties, app.lastProperties):
@@ -137,8 +152,37 @@ def timerFired(app):
         elif properties[0] > ap.note_dictionary[app.comparisonNote][0]:
             app.tune = 'Tune lower.'
             app.tuneColor = 'blue'
-        
 
+    if app.screen == 'loading':
+          # turning samples into auto correlated samples
+        autocorrelation = []
+        for i in range(len(app.properties)):
+            autocorrelation += ap.AutoCorrelation(app.properties[i][5])[0]
+        # getting frequencies, frequency indexes
+        notes = []
+        noteIndexes = []
+        j = 0
+        while j < len(autocorrelation) / 1024:  
+            frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
+            # appending frequencies and indexes of frequencies
+            if ap.pitchToNote(frequency) != None:
+                notes.append(ap.pitchToNote(frequency))
+                index = ((j + 1)*1024)
+                noteIndexes.append(index)
+            j += 1
+        
+        # finding peaks and peak indexes of the autocorrelated samples
+        peaks, peakIndexes = ap.peakFinder(autocorrelation)
+        # padding guitar tab with '-' and '|'
+        while (len(app.guitarTab[0]) - 1) % 7 != 0:
+            for i in app.guitarTab:
+                i.append('-')
+            if len(app.guitarTab[0]) % 7 == 0:
+                for k in app.guitarTab:
+                    k.append('|')  
+        app.final = len(app.guitarTab[0])
+        app.screen = 'tab'
+        
 # key pressed function
 def keyPressed(app, event):
     # to go to directions screen
@@ -160,32 +204,42 @@ def keyPressed(app, event):
     # to stop recording
     if event.key == 's' and app.screen == 'record':
         sd.stop()
-        app.screen = 'tab'
+        app.screen = 'loading'
         app.pitchDetect = False
+
         # padding guitar tab 2D list with '-' to fill screen
+        '''
         if len(app.guitarTab) < app.final and app.final - len(app.guitarTab) > 1:
             for i in app.guitarTab:
                 for j in range(0, app.final-len(app.guitarTab)):
                     i.append('-')
+        
         # putting last lines in '|'
         for i in app.guitarTab:
             i.append('|')
+        
         app.final = len(app.guitarTab[0])
         printNotes(app.storedNotes)
         # gathering legal notes
         notes = ap.tabDissection(app.storedNotes)
         # storing legal notes
         ap.storeTab(notes, app.guitarTab)
+        '''
     # to play the audio
     if app.screen == 'tab':
         # changing tab selected position
         if event.key == 'Right':
             app.tab_y += 1
-            if app.tab_y > app.final - 3:
+            if app.tab_y >= app.final:
                 app.final += 1
-                app.initial += 1
-                for i in app.guitarTab:
-                    i.insert(-1, '-')
+                if app.final >= 90:
+                    app.initial += 1
+                if (len(app.guitarTab[0]) - 1) % 6 == 0:
+                    for i in app.guitarTab:
+                        i.append('|')
+                else:
+                    for i in app.guitarTab:
+                        i.append('-')
         elif event.key == 'Left':
             app.tab_y -= 1
             if app.tab_y < 0:
@@ -341,7 +395,12 @@ def drawRecordingScreen(app, canvas):
     else:
         canvas.create_text(app.width/2, app.height/2.15, text = app.note, font = 'Arial 24 bold', 
                         fill = app.colors[random.randint(0, len(app.colors) - 1)])
-    
+
+# draw loading screen function
+def drawLoadingScreen(app, canvas):
+    canvas.create_text(app.width/2, app.height/2, text = 'Loading Tab', font = 'Arial 20 bold')  
+    #canvas.create_rectangle(app.bar[0], app.bar[1], app.bar[2], app.bar[3], fill = 'blue', outline = 'black')
+
 # draw playing screen function
 def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - app.height/8, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
@@ -382,6 +441,8 @@ def redrawAll(app, canvas):
         drawDirectionsScreen(app, canvas)
     elif app.screen == 'record':
         drawRecordingScreen(app, canvas)
+    elif app.screen == 'loading':
+        drawLoadingScreen(app, canvas)
     elif app.screen == 'tab':
         drawTabScreen(app, canvas)
     elif app.screen == 'tuner':
