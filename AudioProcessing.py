@@ -349,7 +349,46 @@ def peakThreshold(autocorrelated):
     return (threshold, peaks, indexes)
 
 # new algorithm to try and create a successful guitar tab from peaks, frequencies, tabs
-def tabGeneration(autocorrelated, notes, noteIndexes, peaks, peakIndexes):
-    newTab = []
+def tabGeneration(notes, noteIndexes, noteTimes, tempo, peakIndexes, guitarTab):
+    tab = []
+    newNotes = []
+    s = set(peakIndexes)
+    # getting the notes which match up with peaks so notes are measured above a threshold volume
+    for i in range(len(noteIndexes)):
+        if noteIndexes[i] in s:
+            newNotes.append((notes[i], noteTimes[i]))
+    # count variable for which fret to place it in
+    count = 2
+    lastNote = None
+    # loop through new notes, store into guitar tab
+    for i in range(len(newNotes)):
+        note = newNotes[i]
+        if note[0] in standard_guitar_dict:
+            temp = standard_guitar_dict.get(note[0])
+            fret = (-1, -1)
+            # getting lowest fret of given note
+            for i in temp:
+                if i[1] < fret[1]:
+                    fret = i
+            if lastNote != None:
+                # how many measures to move based on division by tempo
+                hop = int((float(note[1]) - float(lastNote[1]))/(tempo/2))
+                count += hop
+        # padding guitar tab
+        while count >= len(guitarTab[0]):
+            for i in guitarTab:
+                i.append('-')
+        # checking if measure is a '|' so as not to replace it
+        if guitarTab[0][count] == '|':
+            count += 1
+        # appending string, fret, and measure number to fret count
+        tab.append((fret[0], fret[1], count))
+        lastNote = note
+        count += 1
+    
+    # storing tabs into guitar tab
+    for i in tab:
+        guitarTab[i[0]][i[2]] = str(fret[1])
+    
 
-    pass
+    

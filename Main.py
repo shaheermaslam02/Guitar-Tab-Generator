@@ -15,7 +15,6 @@ def appStarted(app):
 def resetProgram(app):
     # app variables
     app.audio = ''
-    app.count = 0
     # screen variable to swap screens
     app.screen = 'main'
     # other conditional variables
@@ -67,6 +66,7 @@ def resetProgram(app):
     # bar for loading screen
     app.bar = (app.width/4, app.height/2, app.width/4, app.height/2 + app.height/4)
     app.barCount = 0
+
 # timer fired function
 def timerFired(app):
     # fakeTime variable to keep track of time
@@ -76,13 +76,12 @@ def timerFired(app):
         # getting current pitch and volume properties
         currProperties = ap.newPitchInRealTime(app.params[0], app.params[1], app.params[2], 
                            app.params[3], app.params[4], app.beforeTime)
-        app.properties.append(currProperties)
         # resetting fakeTime when beginning recording
         if app.fake:
             app.fakeTime = 0
             app.fake = False
         # if we are on the beat of the metronome
-        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo)) <= 0:
+        if app.fakeTime != 0 and app.fakeTime % (100*(app.tempo) / 2) <= 0:
             app.measure += 1
             if app.measure > 4:
                 app.measure = 1   
@@ -126,12 +125,17 @@ def timerFired(app):
         if currProperties[3] != None:
             app.note = str(currProperties[3])
             app.tabs = ap.standard_guitar_dict.get(app.note, {})
-            if app.tabs != {}:
+            #if app.tabs != {}:
                 # appending tuple of properties
-                app.storedNotes.append(currProperties[0:-1] + ((len(app.guitarTab[0]) - 1),))
+                #app.storedNotes.append(currProperties[0:-1] + ((len(app.guitarTab[0]) - 1),))
         else:
             app.note = 'No note found.'
             app.tabs = {}
+        
+
+        # appending properties to list of properties for tab creation later            
+        app.properties.append(currProperties)
+
     # call record audio once
     if app.recordOnce:
         app.audio = ap.recordAudio()
@@ -154,13 +158,18 @@ def timerFired(app):
             app.tuneColor = 'blue'
 
     if app.screen == 'loading':
-          # turning samples into auto correlated samples
+        # turning samples into auto correlated samples
         autocorrelation = []
+        # list of times for each 1024 sample
+        times = []
         for i in range(len(app.properties)):
             autocorrelation += ap.AutoCorrelation(app.properties[i][5])[0]
+            times.append(app.properties[i][2])
+
         # getting frequencies, frequency indexes
         notes = []
         noteIndexes = []
+        noteTimes = []
         j = 0
         while j < len(autocorrelation) / 1024:  
             frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
@@ -169,18 +178,24 @@ def timerFired(app):
                 notes.append(ap.pitchToNote(frequency))
                 index = ((j + 1)*1024)
                 noteIndexes.append(index)
+                noteTimes.append(times[j])
             j += 1
-        
+
         # finding peaks and peak indexes of the autocorrelated samples
         peaks, peakIndexes = ap.peakFinder(autocorrelation)
+
         # padding guitar tab with '-' and '|'
         while (len(app.guitarTab[0]) - 1) % 7 != 0:
             for i in app.guitarTab:
                 i.append('-')
             if len(app.guitarTab[0]) % 7 == 0:
-                for k in app.guitarTab:
-                    k.append('|')  
+                    for k in app.guitarTab:
+                        k.append('|')  
         app.final = len(app.guitarTab[0])
+
+        # now, we want to store the notes we've found into the guitar tab itself
+        ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, peakIndexes, app.guitarTab)
+
         app.screen = 'tab'
         
 # key pressed function
@@ -259,10 +274,16 @@ def keyPressed(app, event):
         elif event.key in ap.frets:
             if app.guitarTab[app.tab_x][app.tab_y] == '-':
                 app.guitarTab[app.tab_x][app.tab_y] = event.key
-            elif app.guitarTab[app.tab_x][app.tab_y] in ap.frets and len(app.guitarTab[app.tab_x][app.tab_y]) < 2:
+            elif app.guitarTab[app.tab_x][app.tab_y] in ap.frets and app.guitarTab[app.tab_x][app.tab_y] + event.key in ap.frets:
                 app.guitarTab[app.tab_x][app.tab_y] = app.guitarTab[app.tab_x][app.tab_y] + event.key
         elif event.key == '-' and app.guitarTab[app.tab_x][app.tab_y] in ap.frets:
             app.guitarTab[app.tab_x][app.tab_y] = event.key
+        elif event.key == '-' and app.guitarTab[app.tab_x][app.tab_y] == '|':
+            for i in app.guitarTab:
+                i[app.tab_y] = event.key
+        elif event.key == '|' and (app.guitarTab[app.tab_x][app.tab_y] == '-' or app.guitarTab[app.tab_x][app.tab_y] in ap.frets):
+            for i in app.guitarTab:
+                i[app.tab_y] = event.key
         elif event.key == 'k':
             app.screen = 'kosbie'
     if event.key == 'p' and app.screen == 'tab':
@@ -399,6 +420,7 @@ def drawRecordingScreen(app, canvas):
 # draw loading screen function
 def drawLoadingScreen(app, canvas):
     canvas.create_text(app.width/2, app.height/2, text = 'Loading Tab', font = 'Arial 20 bold')  
+    canvas.create_text(app.width/2, app.height/4, text = 'This may take awhile...', font = 'Arial 20 bold', fill = 'red')
     #canvas.create_rectangle(app.bar[0], app.bar[1], app.bar[2], app.bar[3], fill = 'blue', outline = 'black')
 
 # draw playing screen function
@@ -406,13 +428,14 @@ def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - app.height/8, text = 'Press ''p'' to play recording.', font = 'Arial 12 bold')
     canvas.create_text(app.width/2, app.height - app.height/16, text = 'Press ''f'' to save recording as a file.', font = 'Arial 12 bold')
     canvas.create_text(app.width/2, app.height - app.height/32, text = 'Press ''k'' for a surprise...', font = 'Arial 8 bold', fill = 'red')
+    canvas.create_text(app.width/2, app.height/12, text = 'Directions', font = 'Arial 16 bold')
+    canvas.create_text(app.width/2, app.height/6, text = 'Use the arrow keys to move around the tab, put in your own frets for each string, and extend the tab by moving to the right.', font = 'Arial 12 bold')
     # setting initial bound for drawing tab
     initialBounds = (app.width/16, app.height/3)
     # drawing tab on screen
     for i in range(len(app.guitarTab)):
         height = (app.height/20)
-        fret = 0
-        
+        fret = 0 
         for j in range(app.initial, app.final):
             fret += 1
             if (i, j) == (app.tab_x,app.tab_y):

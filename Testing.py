@@ -50,10 +50,10 @@ while j < len(autocorrelation) / 1024:
 noteIndexes = []
 notes = []
 plotNotes = []
-for i in range(len(frequencies)):
+for i in range(2, len(frequencies)):
     if ap.pitchToNote(frequencies[i]) != None:
         notes.append(ap.pitchToNote(frequencies[i]))
-        plotNotes.append(frequencies[i] / 1000)
+        plotNotes.append(frequencies[i] / 10)
         noteIndexes.append(frequencyIndexes[i])
 
 print(len(frequencies))
@@ -61,18 +61,22 @@ print(len(peaks))
 print(len(notes))
 print(len(autocorrelation))
 print(len(original))
+print(notes)
+print(noteIndexes)
+print(indexes)
 
-fakeFrequencies = [i / 1000 for i in frequencies]
+fakeFrequencies = [i / 10 for i in frequencies[2:]]
 
 # graphing everything
 fig, ax = plt.subplots(figsize = (16, 10))
 ax.plot(lags, original, alpha = 0.3)
 ax.plot(lags, autocorrelation, alpha = 0.5)
 ax.plot(indexes, peaks)
-ax.plot(frequencyIndexes, fakeFrequencies)
+ax.plot(frequencyIndexes[2:], fakeFrequencies)
+#ax.plot(frequencyIndexes, frequencies)
 ax.plot(noteIndexes, plotNotes)
 ax.set_title('Autocorrelated Samples, Original and Highlighted Peaks')
-ax.legend(['Original', 'Autocorrelated', 'Peaks', 'Frequencies', 'Detected Notes'])
+ax.legend(['Original', 'Autocorrelated', 'Peaks', 'Fake Frequencies', 'Detected Notes'])
 ax.grid()
 plt.show()
 
