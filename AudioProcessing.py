@@ -128,23 +128,10 @@ def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTim
     volume = math.sqrt(np.sum(samples**2)/len(samples))
     # format output with 6 decimel places
     volume = "{:6f}".format(volume)
-    pitchFreq = ''
-    # determining whether the pitch is low, mid or high
-    if 0 <= pitch <= 140:
-        pitchFreq = 'Low'
-    elif 140 < pitch <= 2000:
-        pitchFreq = 'Mid'
-    elif pitch > 2000:
-        pitchFreq = 'High'
-    # print loudness value and pitch value
-    '''
-    print(pitchFreq + ' Pitch:', str(pitch), 'Volume:', str(volume), 
-          'Time:', str(afterTime), 'Note:', str(note))
-    '''
-    return(pitch, volume, afterTime, note, tempo)
+    # returning values as a tuple
+    return(pitch, volume, afterTime, note, tempo, samples.tolist())
 
-# pitchToNote function to find the note of a pitch within a
-# range of .45 Hz
+# pitchToNote function to find the note of a pitch within a range of .45 Hz
 def pitchToNote(pitch, notes = note_dictionary):
     for i in notes:
         temp = notes[i][0]
@@ -156,10 +143,111 @@ def pitchToNote(pitch, notes = note_dictionary):
             return i
     return None
 
-################################################################################
+# attempting to use zero crossing rate algorithm to measure pitch
+def zeroCrossingRate(samples):
+    # dividing the number of samples by the sampling rate to get seconds
+    seconds = len(samples)/44100 
+    zero_crossing_points = 0
+    for i in range(0, len(samples) - 1):
+        if samples[i] > 0 and samples[i + 1] < 0:
+            zero_crossing_points += 1
+    oscillations = zero_crossing_points/2
+    frequency = oscillations/seconds
+    return frequency
+
+# attempting to use autocorrelation method algorithm to measure pitch, passing into zero crossing rates
+# finding the patterns within an audio signal, smoothing it out and using the new smoothed sample to find pitch
+def AutoCorrelation(samples):
+    autocorrelation = []
+    for lag in range(len(samples)):
+        total = 0
+        for n in range(len(samples) - lag - 1):
+            total += samples[n] * samples[n + lag]
+        autocorrelation.append(total) 
+    return autocorrelation
+
+# attempting to use the autocorrelated samples for onset detection and finding peaks in audio
+def peakFinder(autocorrelated):
+    # calling helper function
+    threshold, peaks, indexes = peakThreshold(autocorrelated)
+    newPeaks = []
+    newIndexes = []
+    # appending peaks and indexes based on threshold
+    for i in range(len(peaks)):
+        if peaks[i] > threshold:
+            newPeaks.append(peaks[i])
+            newIndexes.append(indexes[i])
+    return newPeaks, newIndexes
+
+# finding the peak threshold by taking the average of all the peaks since peaks in audio should be higher
+def peakThreshold(autocorrelated):
+    indexes = []
+    peaks = []
+    # getting peak threshold by averaging all the peaks since notes should be elevated in pitch
+    for i in range(1, len(autocorrelated) - 1):
+        # finding peaks
+        if autocorrelated[i + 1] < autocorrelated[i] and autocorrelated[i] > autocorrelated[i - 1]:
+            indexes.append(i)
+            peaks.append(autocorrelated[i])
+    # minimum threshold for peak
+    threshold = 0.1
+    return (threshold, peaks, indexes)
+
+# new algorithm to try and create a successful guitar tab from peaks, frequencies, tabs
+def tabGeneration(notes, noteIndexes, noteTimes, tempo, peakIndexes, guitarTab):
+    tab = []
+    newNotes = []
+    s = set(peakIndexes)
+    # getting the notes which match up with peaks so notes are measured above a threshold volume
+    for i in range(len(noteIndexes)):
+        if noteIndexes[i] in s:
+            newNotes.append((notes[i], noteTimes[i]))
+            print('Note:', notes[i])
+    # count variable for which fret to place it in
+    count = 2
+    lastNote = (-1, -1)
+    # loop through new notes, store into guitar tab
+    for i in range(len(newNotes)):
+        changed = False
+        note = newNotes[i]
+        fret = (-1, 25)
+        if note[0] in standard_guitar_dict and note[0] != lastNote[0]:
+            changed = True
+            temp = standard_guitar_dict.get(note[0])
+            # getting lowest fret of given note
+            for i in temp:
+                if i[1] < fret[1]:
+                    fret = i
+            print('Fret:', fret)
+            '''
+            if lastNote != (-1, -1):
+                # how many measures to move based on division by tempo
+                hop = int((float(note[1]) - float(lastNote[1]))/(tempo/2))
+                count += hop
+            '''
+        # padding guitar tab
+        while count >= len(guitarTab[0]):
+            for i in guitarTab:
+                i.append('-')
+        # checking if measure is a '|' so as not to replace it
+        if guitarTab[0][count] == '|':
+            count += 1
+        # appending string, fret, and measure number to fret count
+        if changed:
+            tab.append((fret[0], fret[1], count))
+            lastNote = note
+        count += 1
+    
+    print('Tab:', tab)
+    # storing tabs into guitar tab
+    for i in tab:
+        guitarTab[i[0]][i[2]] = str(i[1])
+    
+
+# old guitar tab generation algorithm: not very efficient or intuitive
+######################################################################
 
 # volume difference function
-
 def volumeDifference(current, last):
     if float(current[1]) - float(last[1]) >= 0.1:
         return True
@@ -260,135 +348,3 @@ def tabDissection(notes):
 def storeTab(notes, tab):
     for i in notes:
         tab[i[0]][i[2]] = str(i[1])
-    
-# going for algorithmic complexity #
-####################################
-
-
-def newPitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
-    # mic listening
-    data = mic.read(hop_size)
-    # convert to aubio.float_type
-    samples = np.fromstring(data,
-            dtype=aubio.float_type)
-    # getting onset
-    onset = oDetection(samples)[0]
-    # getting the pitch
-    pitch = pDetection(samples)[0]
-    # getting time when reading pitch
-    afterTime = (time.time() - beforeTime)
-    # formatting with 6 decimal places
-    afterTime = "{:6f}".format(afterTime)
-    # using helper function with note dictionary to convert pitch to note
-    note = pitchToNote(pitch)
-    # get tempo
-    tempo = tDetection(samples)[0]
-    # getting volume by root mean square, which measures output: 
-    volume = math.sqrt(np.sum(samples**2)/len(samples))
-    # format output with 6 decimel places
-    volume = "{:6f}".format(volume)
-    pitchFreq = ''
-    # determining whether the pitch is low, mid or high
-    if 0 <= pitch <= 140:
-        pitchFreq = 'Low'
-    elif 140 < pitch <= 2000:
-        pitchFreq = 'Mid'
-    elif pitch > 2000:
-        pitchFreq = 'High'
-
-    return(pitch, volume, afterTime, note, tempo, samples)
-
-# attempting to use zero crossing rate algorithm to measure pitch
-def zeroCrossingRate(samples):
-    # dividing the number of samples by the sampling rate to get seconds
-    seconds = len(samples)/44100 
-    zero_crossing_points = 0
-    for i in range(0, len(samples) - 1):
-        if samples[i] > 0 and samples[i + 1] < 0:
-            zero_crossing_points += 1
-    oscillations = zero_crossing_points/2
-    frequency = oscillations/seconds
-    return frequency
-
-# attempting to use autocorrelation method algorithm to measure pitch, passing into zero crossing rates
-# finding the patterns within an audio signal, smoothing it out and using the new smoothed sample to find pitch
-def AutoCorrelation(samples):
-    autocorrelation = []
-    for lag in range(len(samples)):
-        total = 0
-        for n in range(len(samples) - lag - 1):
-            total += samples[n] * samples[n + lag]
-        autocorrelation.append(total) 
-    return (autocorrelation, [n for n in range(len(autocorrelation))])
-
-# attempting to use the autocorrelated samples for onset detection and finding peaks in audio
-def peakFinder(autocorrelated):
-    # calling helper function
-    threshold, peaks, indexes = peakThreshold(autocorrelated)
-    newPeaks = []
-    newIndexes = []
-    # appending peaks and indexes based on threshold
-    for i in range(len(peaks)):
-        if peaks[i] > threshold:
-            newPeaks.append(peaks[i])
-            newIndexes.append(indexes[i])
-    return newPeaks, newIndexes
-
-# finding the peak threshold by taking the average of all the peaks since peaks in audio should be higher
-def peakThreshold(autocorrelated):
-    indexes = []
-    peaks = []
-    # getting peak threshold by averaging all the peaks since notes should be elevated in pitch
-    for i in range(1, len(autocorrelated) - 1):
-        # finding peaks
-        if autocorrelated[i + 1] < autocorrelated[i] and autocorrelated[i] > autocorrelated[i - 1]:
-            indexes.append(i)
-            peaks.append(autocorrelated[i])
-    # minimum threshold for peak
-    threshold = 0.1
-    return (threshold, peaks, indexes)
-
-# new algorithm to try and create a successful guitar tab from peaks, frequencies, tabs
-def tabGeneration(notes, noteIndexes, noteTimes, tempo, peakIndexes, guitarTab):
-    tab = []
-    newNotes = []
-    s = set(peakIndexes)
-    # getting the notes which match up with peaks so notes are measured above a threshold volume
-    for i in range(len(noteIndexes)):
-        if noteIndexes[i] in s:
-            newNotes.append((notes[i], noteTimes[i]))
-    # count variable for which fret to place it in
-    count = 2
-    lastNote = None
-    # loop through new notes, store into guitar tab
-    for i in range(len(newNotes)):
-        note = newNotes[i]
-        if note[0] in standard_guitar_dict:
-            temp = standard_guitar_dict.get(note[0])
-            fret = (-1, -1)
-            # getting lowest fret of given note
-            for i in temp:
-                if i[1] < fret[1]:
-                    fret = i
-            if lastNote != None:
-                # how many measures to move based on division by tempo
-                hop = int((float(note[1]) - float(lastNote[1]))/(tempo/2))
-                count += hop
-        # padding guitar tab
-        while count >= len(guitarTab[0]):
-            for i in guitarTab:
-                i.append('-')
-        # checking if measure is a '|' so as not to replace it
-        if guitarTab[0][count] == '|':
-            count += 1
-        # appending string, fret, and measure number to fret count
-        tab.append((fret[0], fret[1], count))
-        lastNote = note
-        count += 1
-    
-    # storing tabs into guitar tab
-    for i in tab:
-        guitarTab[i[0]][i[2]] = str(fret[1])
-    
-
-    

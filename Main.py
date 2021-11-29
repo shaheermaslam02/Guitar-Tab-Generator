@@ -40,16 +40,17 @@ def resetProgram(app):
     app.tuneColor = 'black'
     app.tabs = set()
     # variable to keep track of guitar tab, 6 empty lists, 6 strings
-    app.guitarTab = [['e', '|'], 
-                     ['B', '|'], 
-                     ['G', '|'], 
-                     ['D', '|'], 
+    app.guitarTab = [['E', '|'], 
                      ['A', '|'], 
-                     ['E', '|']]
+                     ['D', '|'], 
+                     ['G', '|'], 
+                     ['B', '|'], 
+                     ['e', '|']]
     app.bpm = ''
     app.tempo = ''
     app.displayTime = 0
     app.measure = 1
+
     app.fakeTime = 0
     app.fake = False
     # moving through guitar tab
@@ -62,7 +63,7 @@ def resetProgram(app):
     # measure count
     app.count = 0
     # list of all readings from microphone
-    app.properties = []
+    app.samples = []
     # bar for loading screen
     app.bar = (app.width/4, app.height/2, app.width/4, app.height/2 + app.height/4)
     app.barCount = 0
@@ -74,7 +75,7 @@ def timerFired(app):
     # if recording
     if app.pitchDetect:
         # getting current pitch and volume properties
-        currProperties = ap.newPitchInRealTime(app.params[0], app.params[1], app.params[2], 
+        currProperties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
                            app.params[3], app.params[4], app.beforeTime)
         # resetting fakeTime when beginning recording
         if app.fake:
@@ -94,47 +95,18 @@ def timerFired(app):
                 # appending '-' on each beat
                 for i in app.guitarTab:
                     i.append('-')
-        '''
-        # if the note is a legal note based on the last note
-        if app.lastProperties != '' and ap.isLegalNote(currProperties, app.lastProperties):
-            # getting note, string/fret
-            note = currProperties[3]
-            tab = ap.standard_guitar_dict(note, {})
-            stringFret = (-1, -1)
-            # looping through tab, getting lowest string and fret
-            if tab != set():
-                # getting lowest string and fret
-                for i in tab:
-                    if i[0] > stringFret[0]:
-                        stringFret = i
-            # if no string fret was found (ex. note is outside standard guitar notes), just add dashes 
-            if stringFret == (-1, -1):
-                for i in app.guitarTab:
-                    i.append('-')
-            else:
-                # appending correct fret on guitar tab
-                for i in range(len(app.guitarTab)):
-                    if i == stringFret[0]:
-                        app.guitarTab[i].append(str(stringFret[1]))
-                    else:
-                        app.guitarTab[i].append('-')
-        '''
         # display time for recording screen
         app.displayTime = currProperties[2]
         # if there is a note found, get the note, otherwise get nothing
         if currProperties[3] != None:
             app.note = str(currProperties[3])
             app.tabs = ap.standard_guitar_dict.get(app.note, {})
-            #if app.tabs != {}:
-                # appending tuple of properties
-                #app.storedNotes.append(currProperties[0:-1] + ((len(app.guitarTab[0]) - 1),))
         else:
             app.note = 'No note found.'
             app.tabs = {}
         
-
         # appending properties to list of properties for tab creation later            
-        app.properties.append(currProperties)
+        app.samples.append(currProperties)
 
     # call record audio once
     if app.recordOnce:
@@ -162,9 +134,9 @@ def timerFired(app):
         autocorrelation = []
         # list of times for each 1024 sample
         times = []
-        for i in range(len(app.properties)):
-            autocorrelation += ap.AutoCorrelation(app.properties[i][5])[0]
-            times.append(app.properties[i][2])
+        for i in range(len(app.samples)):
+            autocorrelation += ap.AutoCorrelation(app.samples[i][5])
+            times.append(app.samples[i][2])
 
         # getting frequencies, frequency indexes
         notes = []
@@ -174,8 +146,10 @@ def timerFired(app):
         while j < len(autocorrelation) / 1024:  
             frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
             # appending frequencies and indexes of frequencies
-            if ap.pitchToNote(frequency) != None:
-                notes.append(ap.pitchToNote(frequency))
+            temp = ap.pitchToNote(frequency)
+            if temp != None:
+                notes.append(temp)
+                print('Note:', temp)
                 index = ((j + 1)*1024)
                 noteIndexes.append(index)
                 noteTimes.append(times[j])
@@ -189,13 +163,13 @@ def timerFired(app):
             for i in app.guitarTab:
                 i.append('-')
             if len(app.guitarTab[0]) % 7 == 0:
-                    for k in app.guitarTab:
-                        k.append('|')  
-        app.final = len(app.guitarTab[0])
-
+                for k in app.guitarTab:
+                    k.append('|')  
         # now, we want to store the notes we've found into the guitar tab itself
         ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, peakIndexes, app.guitarTab)
 
+        app.final = len(app.guitarTab[0])
+        # changing screens
         app.screen = 'tab'
         
 # key pressed function
@@ -221,25 +195,6 @@ def keyPressed(app, event):
         sd.stop()
         app.screen = 'loading'
         app.pitchDetect = False
-
-        # padding guitar tab 2D list with '-' to fill screen
-        '''
-        if len(app.guitarTab) < app.final and app.final - len(app.guitarTab) > 1:
-            for i in app.guitarTab:
-                for j in range(0, app.final-len(app.guitarTab)):
-                    i.append('-')
-        
-        # putting last lines in '|'
-        for i in app.guitarTab:
-            i.append('|')
-        
-        app.final = len(app.guitarTab[0])
-        printNotes(app.storedNotes)
-        # gathering legal notes
-        notes = ap.tabDissection(app.storedNotes)
-        # storing legal notes
-        ap.storeTab(notes, app.guitarTab)
-        '''
     # to play the audio
     if app.screen == 'tab':
         # changing tab selected position

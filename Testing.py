@@ -14,7 +14,7 @@ i = 0
 autocorrelation = []
 original = []
 while i <= 50:
-    temp = ap.newPitchInRealTime(wrapper[0], wrapper[1], wrapper[2],
+    temp = ap.pitchInRealTime(wrapper[0], wrapper[1], wrapper[2],
                        wrapper[3], wrapper[4], beforeTime)
     #print('Samples: ', temp[5])
 
@@ -26,7 +26,7 @@ while i <= 50:
 
     auto = ap.AutoCorrelation(temp[5])
     original += list(temp[5])
-    autocorrelation += auto[0]
+    autocorrelation += auto
     #frequency = ap.zeroCrossingRate(auto[0])
     #print('Frequency: ', frequency)
     i += 1
@@ -56,6 +56,7 @@ for i in range(2, len(frequencies)):
         plotNotes.append(frequencies[i] / 10)
         noteIndexes.append(frequencyIndexes[i])
 
+
 print(len(frequencies))
 print(len(peaks))
 print(len(notes))
@@ -76,7 +77,7 @@ ax.plot(frequencyIndexes[2:], fakeFrequencies)
 #ax.plot(frequencyIndexes, frequencies)
 ax.plot(noteIndexes, plotNotes)
 ax.set_title('Autocorrelated Samples, Original and Highlighted Peaks')
-ax.legend(['Original', 'Autocorrelated', 'Peaks', 'Fake Frequencies', 'Detected Notes'])
+ax.legend(['Original', 'Autocorrelated', 'Peaks', 'Fake Frequencies', 'Detected Notes', 'Fake AC'])
 ax.grid()
 plt.show()
 
