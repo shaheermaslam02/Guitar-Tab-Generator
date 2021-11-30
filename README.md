@@ -30,7 +30,7 @@ This is just a loading screen while your tab is generated.
 
 ### Tab Screen
 
-Here is where the guitar tab is displayed. You can change the notes, modify and extend the tab, and see what you've got! (You can press 'k' to see something interesting.)
+Here is where the guitar tab is displayed. You can change the notes, modify and extend the tab, and see what you've got! You can press 'p' to play the audio you recorded, and you can press 'f' to save it as a file. (You can press 'k' to see something interesting.)
 
 ### Libraries
 
@@ -49,3 +49,9 @@ The libraries included in this project are as follows:
 ### Bugs
 * MVC violation when going to recording screen at times
 * If no notes detected, error when generating tab
+
+### Something To Note
+The variable 'app.alg' lets you switch between using the zero crossing pitch detection algorithm to the aubio library pitch detection algorithm, where both use autocorrelation and peak detection to generate a guitar tab. The aubio pitch detection algorithm is significantly more accurate since it uses fast fourier transforms, and is used for the guitar tuner and the guitar tab display of notes. Neither options, however, accurately generate a guitar tab - processing guitar notes through microphone audio has a lot of noise, and makes creating accurate tabs extremely difficult. 
+
+### Takeaways
+This project was an amazing learning experience and introduction into audio processing and algorithms related to frequencies, pitch detection, peak detection and more. For future purposes, I will consider delving into fast fourier transforms to develop an even more accurate pitch detection algorithm while using direct onset detection and better cleaning of the noise in the audio samples to create a more accurate guitar tab generator.
