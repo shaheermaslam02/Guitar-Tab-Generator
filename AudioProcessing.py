@@ -112,10 +112,32 @@ def pitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTim
     # convert to aubio.float_type
     samples = np.fromstring(data,
             dtype=aubio.float_type)
-    # getting onset
-    onset = oDetection(samples)[0]
     # getting the pitch
     pitch = pDetection(samples)[0]
+    # getting time when reading pitch
+    afterTime = (time.time() - beforeTime)
+    # formatting with 6 decimal places
+    afterTime = "{:6f}".format(afterTime)
+    # using helper function with note dictionary to convert pitch to note
+    note = pitchToNote(pitch)
+    # get tempo
+    tempo = tDetection(samples)[0]
+    # getting volume by root mean square, which measures output: 
+    volume = math.sqrt(np.sum(samples**2)/len(samples))
+    # format output with 6 decimel places
+    volume = "{:6f}".format(volume)
+    # returning values as a tuple
+    return(pitch, volume, afterTime, note, tempo, samples.tolist())
+
+# autocorrelation x aubio pitch detection
+def autoCorrelatedPitchInRealTime(mic, pDetection, tDetection, oDetection, hop_size, beforeTime):
+    # mic listening
+    data = mic.read(hop_size)
+    # convert to aubio.float_type
+    samples = np.fromstring(data,
+            dtype=aubio.float_type)
+    # getting the pitch
+    pitch = pDetection(np.asarray(AutoCorrelation(samples), dtype = aubio.float_type))[0]
     # getting time when reading pitch
     afterTime = (time.time() - beforeTime)
     # formatting with 6 decimal places
@@ -139,9 +161,13 @@ def pitchToNote(pitch, notes = note_dictionary):
         # next note is around 4.9, so to keep notes distinct based on distance,
         # checking within 2 as distance between note frequencies gets larger
         # the higher you go
-        if temp - 2 <= pitch <= temp + 2 and pitch > 76:
+        if temp - 1 <= pitch <= temp + 1 and pitch > 76:
             return i
     return None
+
+# pitch detection algorithms not accurate in comparison to the aubio pitch detection which
+# uses fast fourier transforms, which is significantly faster and more efficient but difficult
+# to implement
 
 # attempting to use zero crossing rate algorithm to measure pitch
 def zeroCrossingRate(samples):

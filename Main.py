@@ -1,5 +1,8 @@
 # Main file to run the program using cmu_112_graphics for the UI
 
+# change the app.alg variable to 'own' to run the pitch detection NOT using aubio
+# change it to anything else to use pitch detection using aubio
+
 # importing libraries
 from cmu_112_graphics import *
 from tkinter import *
@@ -67,6 +70,13 @@ def resetProgram(app):
     # bar for loading screen
     app.bar = (app.width/4, app.height/2, app.width/4, app.height/2 + app.height/4)
     app.barCount = 0
+    # using aubio library for pitch detection
+    app.libraryNotes = []
+    app.libraryIndexes = []
+    app.libraryNoteTimes = []
+    app.libraryIndex = -1
+    # conditional variable of which alg. to use
+    app.alg = 'own'
 
 # timer fired function
 def timerFired(app):
@@ -74,9 +84,17 @@ def timerFired(app):
     app.fakeTime += 1
     # if recording
     if app.pitchDetect:
-        # getting current pitch and volume properties
-        currProperties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
-                           app.params[3], app.params[4], app.beforeTime)
+        # getting current pitch and properties, personal alg. method
+        if app.alg == 'own':
+            currProperties = ap.pitchInRealTime(app.params[0], app.params[1], app.params[2], 
+                            app.params[3], app.params[4], app.beforeTime)
+        # getting current pitch and properties, aubio alg. method using autocorrelated samples
+        else:
+            currProperties = ap.autoCorrelatedPitchInRealTime(app.params[0], app.params[1], app.params[2], 
+                            app.params[3], app.params[4], app.beforeTime)
+        # indexes for notes based on samples of 1024
+        if app.alg != 'own':
+            app.libraryIndex += 1
         # resetting fakeTime when beginning recording
         if app.fake:
             app.fakeTime = 0
@@ -105,8 +123,16 @@ def timerFired(app):
             app.note = 'No note found.'
             app.tabs = {}
         
-        # appending properties to list of properties for tab creation later            
-        app.samples.append(currProperties)
+        # appending properties to list of properties for tab creation later, own method  
+        if app.alg == 'own':      
+            app.samples.append(currProperties)
+        else:
+            app.samples += currProperties[5]
+        # using autoCorrelated method of pitch detection
+        if currProperties[4] != None and app.alg != 'own':
+            app.libraryNotes.append(currProperties[4])
+            app.libraryIndexes.append(app.libraryIndex)
+            app.libraryNoteTimes.append(currProperties[2])
 
     # call record audio once
     if app.recordOnce:
@@ -130,48 +156,63 @@ def timerFired(app):
             app.tuneColor = 'blue'
 
     if app.screen == 'loading':
-        # turning samples into auto correlated samples
-        autocorrelation = []
-        # list of times for each 1024 sample
-        times = []
-        for i in range(len(app.samples)):
-            autocorrelation += ap.AutoCorrelation(app.samples[i][5])
-            times.append(app.samples[i][2])
+        # this method is by using the autocorrelation/zero crossing algorithm
+        if app.alg == 'own':
+            # turning samples into auto correlated samples
+            autocorrelation = []
+            # list of times for each 1024 sample
+            times = []
+            for i in range(len(app.samples)):
+                autocorrelation += ap.AutoCorrelation(app.samples[i][5])
+                times.append(app.samples[i][2])
 
-        # getting frequencies, frequency indexes
-        notes = []
-        noteIndexes = []
-        noteTimes = []
-        j = 0
-        while j < len(autocorrelation) / 1024:  
-            frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
-            # appending frequencies and indexes of frequencies
-            temp = ap.pitchToNote(frequency)
-            if temp != None:
-                notes.append(temp)
-                print('Note:', temp)
-                index = ((j + 1)*1024)
-                noteIndexes.append(index)
-                noteTimes.append(times[j])
-            j += 1
+            # getting frequencies, frequency indexes
+            notes = []
+            noteIndexes = []
+            noteTimes = []
+            j = 0
+            while j < len(autocorrelation) / 1024:  
+                frequency = ap.zeroCrossingRate(autocorrelation[j * 1024 : (j + 1) * 1024])
+                # appending frequencies and indexes of frequencies
+                temp = ap.pitchToNote(frequency)
+                if temp != None:
+                    notes.append(temp)
+                    print('Note:', temp)
+                    index = ((j + 1)*1024)
+                    noteIndexes.append(index)
+                    noteTimes.append(times[j])
+                j += 1
 
-        # finding peaks and peak indexes of the autocorrelated samples
-        peaks, peakIndexes = ap.peakFinder(autocorrelation)
+            # finding peaks and peak indexes of the autocorrelated samples
+            peaks, peakIndexes = ap.peakFinder(autocorrelation)
 
-        # padding guitar tab with '-' and '|'
-        while (len(app.guitarTab[0]) - 1) % 7 != 0:
-            for i in app.guitarTab:
-                i.append('-')
-            if len(app.guitarTab[0]) % 7 == 0:
-                for k in app.guitarTab:
-                    k.append('|')  
-        # now, we want to store the notes we've found into the guitar tab itself
-        ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, peakIndexes, app.guitarTab)
+            # padding guitar tab with '-' and '|'
+            while (len(app.guitarTab[0]) - 1) % 7 != 0:
+                for i in app.guitarTab:
+                    i.append('-')
+                if len(app.guitarTab[0]) % 7 == 0:
+                    for k in app.guitarTab:
+                        k.append('|')  
+            # now, we want to store the notes we've found into the guitar tab itself
+            ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, peakIndexes, app.guitarTab)
 
-        app.final = len(app.guitarTab[0])
-        # changing screens
-        app.screen = 'tab'
-        
+            app.final = len(app.guitarTab[0])
+            # changing screens
+            app.screen = 'tab'
+        # using alg. with autocorrelation and aubio's pitch detection
+        else:
+            peaks, peakIndexes = ap.peakFinder(app.samples)
+            ap.tabGeneration(app.libraryNotes, app.libraryIndexes, app.libraryNoteTimes, app.tempo, peakIndexes, app.guitarTab)
+            app.final = len(app.guitarTab[0])
+            if app.final < 5:
+                for i in range(0, 5):
+                    for i in app.guitarTab:
+                        i.append('-')
+                for i in app.guitarTab:
+                    i.append('|')
+                app.final = len(app.guitarTab[0])
+            app.screen = 'tab'
+
 # key pressed function
 def keyPressed(app, event):
     # to go to directions screen
