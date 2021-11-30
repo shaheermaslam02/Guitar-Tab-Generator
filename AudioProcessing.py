@@ -5,14 +5,15 @@ import aubio
 import sounddevice as sd
 import pyaudio
 from scipy.io.wavfile import write
-import librosa
 # data breakdown and analysis libraries
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 # miscellaneous libraries
 import math
 import time
 import requests
+
 
 # using pandas to get notes from table from a site (https://stackoverflow.com/questions/10556048/how-to-extract-tables-from-websites-in-python)
 url = 'https://pages.mtu.edu/~suits/notefreqs.html'
@@ -374,3 +375,14 @@ def tabDissection(notes):
 def storeTab(notes, tab):
     for i in notes:
         tab[i[0]][i[2]] = str(i[1])
+
+def graphAudio(autocorrelation, peaks, peakIndexes, notes, noteIndexes, frequencies):
+    fig, ax = plt.subplots(figsize = (16, 10))
+    lags = [l for l in range(len(autocorrelation))]
+    ax.plot(lags, autocorrelation, alpha = 0.5)
+    ax.plot(peakIndexes, peaks)
+    ax.plot(noteIndexes, frequencies)
+    ax.set_title('Autocorrelated Samples, Peaks, Frequencies')
+    ax.legend(['Autocorrelated Samples', 'Peaks', 'Detected Notes', 'Fake AC'])
+    ax.grid()
+    plt.show()

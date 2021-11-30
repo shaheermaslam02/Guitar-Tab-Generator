@@ -76,9 +76,12 @@ def resetProgram(app):
     app.libraryNotes = []
     app.libraryIndexes = []
     app.libraryNoteTimes = []
+    app.libraryFrequencies = []
     app.libraryIndex = -1
     # conditional variable of which alg. to use
     app.alg = 'own'
+    
+    app.auto = []
 
 # timer fired function
 def timerFired(app):
@@ -95,8 +98,7 @@ def timerFired(app):
             currProperties = ap.autoCorrelatedPitchInRealTime(app.params[0], app.params[1], app.params[2], 
                             app.params[3], app.params[4], app.beforeTime)
         # indexes for notes based on samples of 1024
-        if app.alg != 'own':
-            app.libraryIndex += 1
+        app.libraryIndex += 1
         # resetting fakeTime when beginning recording
         if app.fake:
             app.fakeTime = 0
@@ -131,10 +133,11 @@ def timerFired(app):
         else:
             app.samples += currProperties[5]
         # using autoCorrelated method of pitch detection
-        if currProperties[4] != None and app.alg != 'own':
+        if currProperties[4] != None:
             app.libraryNotes.append(currProperties[4])
             app.libraryIndexes.append(app.libraryIndex)
             app.libraryNoteTimes.append(currProperties[2])
+            app.libraryFrequencies.append(currProperties[0])
 
     # call record audio once
     if app.recordOnce:
@@ -186,8 +189,8 @@ def timerFired(app):
                 j += 1
 
             # finding peaks and peak indexes of the autocorrelated samples
-            peaks, peakIndexes = ap.peakFinder(autocorrelation)
-
+            app.peaks, app.peakIndexes = ap.peakFinder(autocorrelation)
+            app.auto = autocorrelation
             # padding guitar tab with '-' and '|'
             while (len(app.guitarTab[0]) - 1) % 7 != 0:
                 for i in app.guitarTab:
@@ -196,15 +199,15 @@ def timerFired(app):
                     for k in app.guitarTab:
                         k.append('|')  
             # now, we want to store the notes we've found into the guitar tab itself
-            ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, peakIndexes, app.guitarTab)
+            ap.tabGeneration(notes, noteIndexes, noteTimes, app.tempo, app.peakIndexes, app.guitarTab)
 
             app.final = len(app.guitarTab[0])
             # changing screens
             app.screen = 'tab'
         # using alg. with autocorrelation and aubio's pitch detection
         else:
-            peaks, peakIndexes = ap.peakFinder(app.samples)
-            ap.tabGeneration(app.libraryNotes, app.libraryIndexes, app.libraryNoteTimes, app.tempo, peakIndexes, app.guitarTab)
+            app.peaks, app.peakIndexes = ap.peakFinder(app.samples)
+            ap.tabGeneration(app.libraryNotes, app.libraryIndexes, app.libraryNoteTimes, app.tempo, app.peakIndexes, app.guitarTab)
             app.final = len(app.guitarTab[0])
             if app.final < 5:
                 for i in range(0, 5):
@@ -284,6 +287,8 @@ def keyPressed(app, event):
                 i[app.tab_y] = event.key
         elif event.key == 'k':
             app.screen = 'kosbie'
+    if event.key == 'g' and app.screen == 'tab':
+        ap.graphAudio(app.auto, app.peaks, app.peakIndexes, app.libraryNotes, app.libraryIndexes, app.libraryFrequencies)
     if event.key == 'p' and app.screen == 'tab':
         ap.playAudio(app.audio)
     # to go back to main screen
@@ -428,6 +433,7 @@ def drawTabScreen(app, canvas):
     canvas.create_text(app.width/2, app.height - app.height/32, text = 'Press ''k'' for a surprise...', font = 'Arial 8 bold', fill = 'red')
     canvas.create_text(app.width/2, app.height/12, text = 'Directions', font = 'Arial 16 bold')
     canvas.create_text(app.width/2, app.height/6, text = 'Use the arrow keys to move around the tab, put in your own frets for each string, and extend the tab by moving to the right.', font = 'Arial 12 bold')
+    canvas.create_text(app.width/2, app.height - app.height/6, text = 'Press ''g'' to graph the audio.', font = 'Arial 12 bold')
     # setting initial bound for drawing tab
     initialBounds = (app.width/16, app.height/3)
     # drawing tab on screen

@@ -66,7 +66,7 @@ print(notes)
 print(noteIndexes)
 print(indexes)
 
-fakeFrequencies = [i / 10 for i in frequencies[2:]]
+fakeFrequencies = [i / 1000 for i in frequencies[2:]]
 
 # graphing everything
 fig, ax = plt.subplots(figsize = (16, 10))
