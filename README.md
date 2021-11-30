@@ -1,4 +1,4 @@
-# 112TermProject
+# 112 Term Project
 
 ## Guitar Tab Generator
 
