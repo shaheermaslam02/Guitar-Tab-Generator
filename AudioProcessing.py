@@ -376,13 +376,17 @@ def storeTab(notes, tab):
     for i in notes:
         tab[i[0]][i[2]] = str(i[1])
 
+# graphing audio function using samples, peaks, frequencies, etc.
 def graphAudio(autocorrelation, peaks, peakIndexes, notes, noteIndexes, frequencies):
     fig, ax = plt.subplots(figsize = (16, 10))
     lags = [l for l in range(len(autocorrelation))]
+    f = [i/50 for i in frequencies]
     ax.plot(lags, autocorrelation, alpha = 0.5)
     ax.plot(peakIndexes, peaks)
-    ax.plot(noteIndexes, frequencies)
+    ax.plot(noteIndexes, f)
     ax.set_title('Autocorrelated Samples, Peaks, Frequencies')
-    ax.legend(['Autocorrelated Samples', 'Peaks', 'Detected Notes', 'Fake AC'])
+    ax.legend(['Autocorrelated Samples', 'Peaks', 'Detected Frequencies'])
+    ax.set_xlabel('Index')
+    ax.set_ylabel('Energy')
     ax.grid()
     plt.show()
